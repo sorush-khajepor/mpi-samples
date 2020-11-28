@@ -4,8 +4,13 @@
 #include <random>
 #include <cmath>
 
-using namespace std;
+#include <algorithm>
+#include <iterator>
 
+using namespace std;
+typedef vector<char> vchar;
+
+// Randomely gives 't' or 'f'
 char TossCoin()
 {
     static std::default_random_engine         e{};
@@ -13,10 +18,20 @@ char TossCoin()
     return d(e)==0?'f':'t';
 }
 
-typedef vector<char> vchar;
+/*
+Section points:
 
-struct Section{
-    Section(vchar& _points)
+     Left Boundary        Internal points          Right Boundary 
+
+Left ghost   Left point                      Right point    Right ghost
+
+    *            +          +        +           +            *
+
+*/
+
+// A road section each processor solves
+struct RoadSection{
+    RoadSection(vchar& _points)
     :points(_points)
     {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -34,8 +49,8 @@ struct Section{
         // internal movement, so they are backed up in tmp variables.
         tmpLeftPoint = points.front();
         tmpRightPoint = points.back();
-        MPI_Isend(&tmpLeftPoint, 1, MPI_CHAR, leftRank, 0, MPI_COMM_WORLD, &reql);
-        MPI_Isend(&tmpRightPoint, 1, MPI_CHAR, rightRank, 0, MPI_COMM_WORLD, &reqr);
+        MPI_Isend(&tmpLeftPoint, 1, MPI_CHAR, leftRank, 0, MPI_COMM_WORLD, &leftReq);
+        MPI_Isend(&tmpRightPoint, 1, MPI_CHAR, rightRank, 0, MPI_COMM_WORLD, &rightReq);
     }
     void MoveInternalPoints(){
         char points_i = points[0];
@@ -59,9 +74,9 @@ struct Section{
         MPI_Wait(&req , MPI_STATUS_IGNORE);
     }
     void MoveBoundaryPoints(){
-
-        MPI_Wait( &reqr , MPI_STATUS_IGNORE);
-        MPI_Wait( &reql , MPI_STATUS_IGNORE);
+        // This release tmpLeftPoint, tmpRightPoint
+        MPI_Wait( &rightReq , MPI_STATUS_IGNORE);
+        MPI_Wait( &leftReq , MPI_STATUS_IGNORE);
 
         if (leftGhost=='t' && tmpLeftPoint!='t'){
                 swap(leftGhost, tmpLeftPoint);
@@ -73,7 +88,7 @@ struct Section{
         }
     }
     void Display(int step){
-        cout<<step<<" "<< rank<<" "<<points[0]<<points[1]<<points[2]<<points[3]<<endl;
+          std::copy (std::begin(points), std::end(points), std::ostream_iterator<char>(std::cout, ", ") );
     }
 
     void Run(){
@@ -93,8 +108,37 @@ private:
     int leftRank;
     int rightRank;
     vchar& points;
-    MPI_Request reqr;
-    MPI_Request reql;
+    MPI_Request rightReq;
+    MPI_Request leftReq;
+};
+
+/*
+Initialize all points randomely in one processor.
+Each point is either true (contains a car)  or false (without a car).
+density: percentage of cars (true points) in all points, should be =< 1.
+allPoints: all points in the whole MPI world.
+*/
+void initAllPoints(double density, vchar allPoints, int allPointsCount)
+{
+    int CarsCount =  round(density * allPointsCount);
+    allPoints.resize(allPointsCount);
+    for(char& point:allPoints)
+        point = 'f';
+    
+    // loop over points define them by tossing a coin
+    // unitl we have the required number of cars.
+    size_t i=0;
+    int sum=0;
+    while (sum<CarsCount)
+    {
+        auto result = TossCoin();
+        if (result=='t' && allPoints[i]!='t')
+        { 
+            allPoints[i] = result;
+            sum++;
+        }
+        i = (i+1)%allPoints.size();
+    }
 };
 
 int main(){
@@ -103,47 +147,43 @@ int main(){
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    // Number of car movement steps
+    int steps = 6;
+
+
+    // Totol number of points in MPI world
+    int allPointsCount = 8;
+
+    // Percentage of cars in all points
+    double density = 0.25;
+
+    int pointsCount = allPointsCount/size;
+
+    // Points allocated to each processor
+    vchar points(pointsCount,'f');
     
-    int NumberOfAllPoints = 8;
-    int n = NumberOfAllPoints/size;
-    vchar points(n,'f');
+    // Only declare allPoints, so all processors know it exists 
     vchar allPoints;
 
+    // Only rank 0 initializes allPoints
     if (rank==0){
-        double density = 0.25;
-        int NoCars =  round(density * NumberOfAllPoints);
-        allPoints.resize(NumberOfAllPoints);
-        for(char& point:allPoints)
-            point = 'f';
-        
-        size_t i=0;
-        int sum=0;
-        while (sum<NoCars)
-        {
-            auto tmp = allPoints[i];
-            allPoints[i] = TossCoin();
-            
-            if (tmp!='t' && allPoints[i]=='t')
-                sum++;
-            else if (tmp=='t' && allPoints[i]!='t')
-                sum--;
-
-            i = (i+1)%allPoints.size();
-        }
+        initAllPoints(density, allPoints, allPointsCount);
     }
 
-    MPI_Scatter( &allPoints[0] , n , MPI_CHAR , &points[0] , n , MPI_CHAR , 0 , MPI_COMM_WORLD);        
+    // Rank 0 distributes points of each processor
+    MPI_Scatter( &allPoints[0] , pointsCount , MPI_CHAR , &points[0] , pointsCount , MPI_CHAR , 0 , MPI_COMM_WORLD);        
 
-    
-    Section s(points);
-
-    for (size_t i = 0; i < 6; i++)
+    for(auto n:allPoints)
+        cout<<n;
+    RoadSection section(points);
+/*
+    for (auto i = 0; i < steps; i++)
     {
-        s.Run();
-        s.Display(i);
+        section.Run();
+        section.Display(i);
     }
     
-
+*/
     MPI_Finalize();
     return 0;
 }
