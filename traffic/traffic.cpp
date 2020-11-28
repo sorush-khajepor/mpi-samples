@@ -10,8 +10,8 @@ using namespace std;
 
 typedef vector<int> vbool;
 int NotRank=-1;
-struct Section{
-    Section(vbool& _points)
+struct RoadSection{
+    RoadSection(vbool& _points)
     :points(_points)
     {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -29,9 +29,9 @@ struct Section{
         tmpRightPoint = points.back();
         if (leftRank!=NotRank)
             MPI_Isend(&tmpLeftPoint, 1, MPI_C_BOOL, 
-            leftRank, 0, MPI_COMM_WORLD, &reql);
+            leftRank, 0, MPI_COMM_WORLD, &leftReq);
         if (rightRank!=NotRank)
-            MPI_Isend(&tmpRightPoint, 1, MPI_C_BOOL, rightRank, 0, MPI_COMM_WORLD, &reqr);
+            MPI_Isend(&tmpRightPoint, 1, MPI_C_BOOL, rightRank, 0, MPI_COMM_WORLD, &rightReq);
     }
     void MoveInternalPoints(){
         bool points_i=points[0];
@@ -60,9 +60,9 @@ struct Section{
     void MoveBoundaryPoints(){
 
         if (rightRank!=NotRank)
-            MPI_Wait( &reqr , MPI_STATUS_IGNORE);
+            MPI_Wait( &rightReq , MPI_STATUS_IGNORE);
         if (leftRank!=NotRank)
-            MPI_Wait( &reql , MPI_STATUS_IGNORE);
+            MPI_Wait( &leftReq , MPI_STATUS_IGNORE);
 
         if (leftGhost && !tmpLeftPoint && leftRank!=NotRank){
                 swap(leftGhost, tmpLeftPoint);
@@ -95,8 +95,8 @@ private:
     int leftRank;
     int rightRank;
     vbool& points;
-    MPI_Request reqr;
-    MPI_Request reql;
+    MPI_Request rightReq;
+    MPI_Request leftReq;
 };
 
 int main(){
@@ -112,7 +112,7 @@ int main(){
         points[1]=true;
         points[2] = true;
     }
-    Section s(points);
+    RoadSection s(points);
 
     for (size_t i = 0; i < 6; i++)
     {
