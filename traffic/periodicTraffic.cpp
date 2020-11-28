@@ -10,6 +10,12 @@
 using namespace std;
 typedef vector<char> vchar;
 
+string vcharToString(vchar& vector){
+    std::string str; 
+    for (char element:vector)
+        str.push_back(element=='t'?'1':'-');
+    return str;
+}
 // Randomely gives 't' or 'f'
 char TossCoin()
 {
@@ -88,7 +94,8 @@ struct RoadSection{
         }
     }
     void Display(int step){
-          std::copy (std::begin(points), std::end(points), std::ostream_iterator<char>(std::cout, ", ") );
+          
+        cout<<"Step="<<step<<" Rank="<<rank<<" points="<< vcharToString(points)<<endl;
     }
 
     void Run(){
@@ -118,7 +125,7 @@ Each point is either true (contains a car)  or false (without a car).
 density: percentage of cars (true points) in all points, should be =< 1.
 allPoints: all points in the whole MPI world.
 */
-void initAllPoints(double density, vchar allPoints, int allPointsCount)
+void initAllPoints(double& density, vchar& allPoints, int& allPointsCount)
 {
     int CarsCount =  round(density * allPointsCount);
     allPoints.resize(allPointsCount);
@@ -168,22 +175,25 @@ int main(){
     // Only rank 0 initializes allPoints
     if (rank==0){
         initAllPoints(density, allPoints, allPointsCount);
-    }
+        cout<<" All Points = "<< vcharToString(allPoints) <<endl;
+    }    
 
     // Rank 0 distributes points of each processor
     MPI_Scatter( &allPoints[0] , pointsCount , MPI_CHAR , &points[0] , pointsCount , MPI_CHAR , 0 , MPI_COMM_WORLD);        
 
-    for(auto n:allPoints)
-        cout<<n;
+    
     RoadSection section(points);
-/*
+
+    // Show initial poitns of each section
+    section.Display(0);
+
+    // Move Cars
     for (auto i = 0; i < steps; i++)
     {
         section.Run();
-        section.Display(i);
+        section.Display(i+1);
     }
     
-*/
     MPI_Finalize();
     return 0;
 }
