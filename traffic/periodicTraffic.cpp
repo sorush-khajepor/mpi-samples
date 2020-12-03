@@ -63,10 +63,8 @@ struct RoadSection{
         for (size_t i = 0; i < points.size()-1; i++)
         {
             if (points_i=='t' && points[i+1]!='t' ){
-                // Backing up points[i+1] for the next 
-                // round which will be points[i].
-                points_i = points[i+1];
-                swap(points[i], points[i+1]);
+                points_i = points[i+1]; // Backing up points[i+1] for the next round which will be points[i].
+                swap(points[i], points[i+1]); // points_i was 't', so Points[i] is not overwritten in previous step
             }
             else{
                 points_i = points[i+1];
