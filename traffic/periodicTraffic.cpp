@@ -1,11 +1,7 @@
 #include <mpi.h>
-#include <stdio.h>
+#include<iostream>
 #include <vector>
 #include <random>
-#include <cmath>
-
-#include <algorithm>
-#include <iterator>
 
 using namespace std;
 typedef vector<char> vchar;
