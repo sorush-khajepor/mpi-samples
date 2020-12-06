@@ -7,17 +7,9 @@
         {
             "name": "mpic++ - Build and debug active file",
             "type": "cppdbg",
-            "request": "launch",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": [
-                "-np",
-                "1",
-                "${fileDirname}/${fileBasenameNoExtension}"
-            ],
-            "stopAtEntry": true,
-            "cwd": "${workspaceFolder}",
-            "environment": [{ "name": "TMPDIR", "value": "/tmp" }],
-            "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
                 {
